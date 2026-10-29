@@ -11,7 +11,7 @@
     xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
     Title="开始使用"
     Width="700"
-    Height="490"
+    Height="620"
     ui:Design.Background="{DynamicResource ApplicationBackgroundBrush}"
     ui:Design.Foreground="{DynamicResource TextFillColorPrimaryBrush}"
     ExtendsContentIntoTitleBar="True"
@@ -62,7 +62,7 @@
                 <Run Text="按钮（在 LiveCaptions Translator 的设置页中），将 Windows LiveCaptions 隐藏。&#x0A;" />
                 <Run Text="&#x0A;程序已自动跳转到设置页，并打开了 Windows LiveCaptions。" />
                 <Run Text="配置完成后，切回主页面即可开始实时语音翻译。&#x0A;" />
-                <Run Text="&#x0A;了解更多请访问我们的 wiki：" />
+                <Run Text="&#x0A;了解更多请访问原项目 wiki：" />
                 <Hyperlink NavigateUri="https://github.com/SakiRinn/LiveCaptions-Translator/wiki" RequestNavigate="Hyperlink_RequestNavigate">
                     https://github.com/SakiRinn/LiveCaptions-Translator/wiki
                 </Hyperlink>
@@ -71,6 +71,38 @@
                 <Run FontWeight="DemiBold" TextDecorations="Underline" Text="源语言" />
                 <Run Text="，请先在设置页点击 [显示] 展开 LiveCaptions，再在 Windows LiveCaptions 中操作。" />
             </ui:TextBlock>
+
+            <!-- 本汉化版署名与链接（本分支新增） -->
+            <ui:Card Margin="20,0,20,0" Padding="12,10">
+                <StackPanel>
+                    <TextBlock Margin="0,0,0,4">
+                        <Run FontWeight="SemiBold" Text="本汉化版：" />
+                        <Run Text="简体中文界面 + 新增「文本」页（作者 " />
+                        <Hyperlink NavigateUri="https://github.com/Sky-lll27" RequestNavigate="Hyperlink_RequestNavigate">
+                            <Run Text="@Sky-lll27" />
+                        </Hyperlink>
+                        <Run Text="）" />
+                    </TextBlock>
+                    <TextBlock Margin="0,0,0,2">
+                        <Run FontWeight="SemiBold" Text="汉化仓库：" />
+                        <Hyperlink NavigateUri="https://github.com/Sky-lll27/LiveCaptions-Translator" RequestNavigate="Hyperlink_RequestNavigate">
+                            <Run Text="https://github.com/Sky-lll27/LiveCaptions-Translator" />
+                        </Hyperlink>
+                    </TextBlock>
+                    <TextBlock Margin="0,0,0,2">
+                        <Run FontWeight="SemiBold" Text="下载新版 / 反馈问题：" />
+                        <Hyperlink NavigateUri="https://github.com/Sky-lll27/LiveCaptions-Translator/releases" RequestNavigate="Hyperlink_RequestNavigate">
+                            <Run Text="Releases 发行页" />
+                        </Hyperlink>
+                    </TextBlock>
+                    <TextBlock>
+                        <Run FontWeight="SemiBold" Text="B站：" />
+                        <Hyperlink NavigateUri="https://space.bilibili.com/496538808" RequestNavigate="Hyperlink_RequestNavigate">
+                            <Run Text="https://space.bilibili.com/496538808" />
+                        </Hyperlink>
+                    </TextBlock>
+                </StackPanel>
+            </ui:Card>
 
             <ui:Button
                 Margin="0,10,0,0"

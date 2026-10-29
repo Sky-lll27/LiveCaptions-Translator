@@ -50,6 +50,17 @@ namespace LiveCaptionsTranslator.models
             // 用 LatencyPrefix() 而不是 NoticePrefix()：后者是贪婪匹配，
             // 译文正文里若带方括号会被一起吃掉。
             string loggedText = RegexPatterns.LatencyPrefix().Replace(translatedText, string.Empty);
+
+            // 报错和「模型没翻、把原文抄回来」的结果不写入历史。
+            // 上游会把这两种都当成功存进去：库里 1495 条里有 288 条是 [ERROR]，
+            // 另有一批译文与原文完全相同，翻历史时很难分辨哪条是真译文。
+            // 显示保持不变（用户仍然看得到失败提示），只是不污染历史库。
+            bool isFailure = loggedText.Contains("[ERROR]") || loggedText.Contains("[WARNING]");
+            bool isUntranslated = !isFailure && TranslationQuality.IsUntranslated(
+                translationTask.OriginalText, loggedText, Translator.Setting?.TargetLanguage ?? "zh-CN");
+            if (isFailure || isUntranslated)
+                return;
+
             bool isOverwrite = await Translator.IsOverwrite(translationTask.OriginalText);
             if (!isOverwrite)
                 await Translator.AddContexts();

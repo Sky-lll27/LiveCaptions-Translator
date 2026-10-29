@@ -18,6 +18,11 @@ namespace LiveCaptionsTranslator
         private static readonly Queue<string> pendingTextQueue = new();
         private static readonly TranslationTaskQueue translationTaskQueue = new();
 
+        // 进程启动后的第一句走「宽容超时」管道，避开本地模型冷启动（实测 7.6~8.7 秒）
+        // 正好压在字幕链路 8 秒线上的问题。模型已在显存时首句也几乎不受影响，
+        // 因为宽松超时只在「等」的时候才体现出来，不会让快的情况变慢。
+        private static int coldStartPending = 1;
+
         public static AutomationElement? Window
         {
             get => window;
@@ -230,6 +235,9 @@ namespace LiveCaptionsTranslator
             }
         }
 
+        /// <summary>未翻译重试的最多次数。只重试 1 次：再多会挤爆字幕链路的 8 秒预算。</summary>
+        private const int MAX_UNTRANSLATED_RETRY = 1;
+
         public static async Task<(string, bool)> Translate(string text, CancellationToken token = default)
         {
             string translatedText;
@@ -239,15 +247,26 @@ namespace LiveCaptionsTranslator
             {
                 var sw = Setting.MainWindow.LatencyShow ? Stopwatch.StartNew() : null;
 
-                if (Setting.ContextAware && !TranslateAPI.IsLLMBased)
+                translatedText = await TranslateOnce(text, token);
+
+                // 检测「模型没翻、把原文抄回来」：判为没翻就重试一次。
+                // 这是本地小模型（1.8B/2B）最常见的失败方式，上游把它当成功处理。
+                // 注意：只对 LLM 类渠道做这个检测——传统翻译引擎（Google/DeepL 等）
+                // 不会出现「抄原文」，多一次检测只是浪费。
+                if (TranslateAPI.IsLLMBased &&
+                    TranslationQuality.IsUntranslated(text, translatedText, Setting.TargetLanguage))
                 {
-                    translatedText = await TranslateAPI.TranslateFunction($"{Caption.AwareContextsCaption} 🔤 {text} 🔤", token);
-                    translatedText = RegexPatterns.TargetSentence().Match(translatedText).Groups[1].Value;
-                }
-                else
-                {
-                    translatedText = await TranslateAPI.TranslateFunction(text, token);
-                    translatedText = translatedText.Replace("🔤", "");
+                    for (int attempt = 0; attempt < MAX_UNTRANSLATED_RETRY; attempt++)
+                    {
+                        token.ThrowIfCancellationRequested();
+                        string retried = await TranslateOnce(text, token);
+
+                        // 重试结果只要是「没被判为没翻」，就采用它；
+                        // 若还是没翻，保留最后一次结果（至少不是更早的），继续循环或结束。
+                        translatedText = retried;
+                        if (!TranslationQuality.IsUntranslated(text, retried, Setting.TargetLanguage))
+                            break;
+                    }
                 }
 
                 if (sw != null)
@@ -266,6 +285,35 @@ namespace LiveCaptionsTranslator
             }
 
             return (translatedText, isChoke);
+        }
+
+        /// <summary>单次翻译调用（不含检测与重试），带上下文感知分支。</summary>
+        private static async Task<string> TranslateOnce(string text, CancellationToken token)
+        {
+            string translatedText;
+            if (Setting.ContextAware && !TranslateAPI.IsLLMBased)
+            {
+                translatedText = await TranslateAPI.TranslateFunction($"{Caption.AwareContextsCaption} 🔤 {text} 🔤", token);
+                translatedText = RegexPatterns.TargetSentence().Match(translatedText).Groups[1].Value;
+            }
+            else
+            {
+                translatedText = await TranslateViaPipeline(text, token);
+                translatedText = translatedText.Replace("🔤", "");
+            }
+            return translatedText;
+        }
+
+        /// <summary>
+        /// 决定这一次翻译走哪条超时管道：进程启动后的第一句用 30 秒（冷启动），其余 8 秒。
+        /// 首次调用即把标记清零，后续句子不受影响。
+        /// </summary>
+        private static async Task<string> TranslateViaPipeline(string text, CancellationToken token)
+        {
+            bool isColdStart = Interlocked.Exchange(ref coldStartPending, 0) == 1;
+            if (isColdStart)
+                return await TranslateAPI.TranslateWithColdStartRoom(text, token);
+            return await TranslateAPI.TranslateFunction(text, token);
         }
 
         public static async Task Log(string originalText, string translatedText,

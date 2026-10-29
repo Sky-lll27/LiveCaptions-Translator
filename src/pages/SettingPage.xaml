@@ -1,4 +1,4 @@
-﻿<!-- zh-CN localization: user-visible strings translated to Simplified Chinese by Sky-lll27
+<!-- zh-CN localization: user-visible strings translated to Simplified Chinese by Sky-lll27
 (AI-assisted draft, human-reviewed), 2026-09. Based on SakiRinn/LiveCaptions-Translator v1.6
 (Apache-2.0). Logic unchanged. -->
 <Page
@@ -25,7 +25,7 @@
         <StackPanel Grid.Column="0" Orientation="Vertical">
             <StackPanel Margin="15,0,0,0" Orientation="Vertical">
                 <StackPanel VerticalAlignment="Center" Orientation="Horizontal">
-                    <TextBlock Margin="2.5,0,0,5" Text="LiveCaptions" />
+                    <TextBlock Margin="2.5,0,0,5" Text="实时字幕" />
                     <ui:Flyout x:Name="LiveCaptionsInfoFlyout">
                         <TextBlock Width="300" TextWrapping="Wrap">
                             <Run Text="Windows 11 24H2 及更高版本中，你只能在 LiveCaptions 中修改" />
@@ -166,7 +166,13 @@
                     FontSize="13.3"
                     IsEditable="True"
                     LostFocus="TargetLangBox_LostFocus"
-                    SelectionChanged="TargetLangBox_SelectionChanged" />
+                    SelectionChanged="TargetLangBox_SelectionChanged">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding Display}" />
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
             </StackPanel>
         </StackPanel>
 

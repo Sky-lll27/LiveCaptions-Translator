@@ -1,4 +1,4 @@
-﻿// 本文件为本分支新增（上游 v1.6 无此功能），作者 Sky-lll27，2026-10。
+// 本文件为本分支新增（上游 v1.6 无此功能），作者 Sky-lll27，2026-10。
 // Based on SakiRinn/LiveCaptions-Translator (Apache-2.0). 本文件随本仓库整体以 Apache-2.0 分发。
 using System.Diagnostics;
 using System.Net.Http;
@@ -32,6 +32,10 @@ namespace LiveCaptionsTranslator
         /// <summary>单个片段的 UTF-8 字节上限。控制在 360 字节（约 120 个汉字）以内，
         /// 这样一段译文基本不会撞上云端 LLM 的 max_tokens 上限。</summary>
         private const int MAX_SEGMENT_BYTES = 360;
+
+        /// <summary>未翻译重试的最多次数。文本页走 120 秒管道，余量充足，但仍只重试 1 次——
+        /// 小模型抄原文是能力问题，重试 2 次以上收益很低却会让长文等待翻倍。</summary>
+        private const int MAX_UNTRANSLATED_RETRY = 1;
 
         /// <summary>超过这个时间还没出第一段译文，就给出「为什么在等」的解释。</summary>
         private const double STAGE2_DELAY_SECONDS = 1.2;
@@ -385,6 +389,9 @@ namespace LiveCaptionsTranslator
                 return;
             }
 
+            // 未翻译检测需要目标语言；取不到就退回 zh-CN（与默认配置一致）。
+            string targetLanguage = Translator.Setting?.TargetLanguage ?? "zh-CN";
+
             translating = true;
             finishedSegments.Clear();
             cts?.Dispose();
@@ -435,6 +442,37 @@ namespace LiveCaptionsTranslator
                         SetStatus(result, StatusKind.Error);
                         LatencyLabel.Text = $"已翻好 {done}/{segments.Count} 段，第 {done + 1} 段出错";
                         return;
+                    }
+
+                    // 检测「模型没翻、把原文抄回来」：判为没翻就重试一次。
+                    // 文本页走 120 秒管道，余量充足，所以这里比字幕链路更该重试。
+                    if (TranslateAPI.IsLLMBased &&
+                        TranslationQuality.IsUntranslated(segments[done], result, targetLanguage))
+                    {
+                        for (int attempt = 0; attempt < MAX_UNTRANSLATED_RETRY; attempt++)
+                        {
+                            token.ThrowIfCancellationRequested();
+                            string retried;
+                            try
+                            {
+                                retried = await TranslateAPI.TranslatePatiently(segments[done], token);
+                            }
+                            catch (OperationCanceledException)
+                            {
+                                throw;
+                            }
+                            catch (Exception)
+                            {
+                                break;
+                            }
+
+                            retried = NormalizeResult(retried);
+                            if (IsFailure(retried))
+                                break;
+                            result = retried;
+                            if (!TranslationQuality.IsUntranslated(segments[done], retried, targetLanguage))
+                                break;
+                        }
                     }
 
                     finishedSegments.Add(result);

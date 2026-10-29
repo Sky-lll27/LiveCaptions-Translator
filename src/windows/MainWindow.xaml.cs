@@ -173,58 +173,100 @@ namespace LiveCaptionsTranslator
             if (Translator.FirstUseFlag)
                 return;
 
-            string latestVersion = string.Empty;
-            try
-            {
-                latestVersion = await UpdateUtil.GetLatestVersion();
-            }
-            catch (Exception ex)
-            {
-                SnackbarHost.Show("[ERROR] Update Check Failed.", ex.Message, SnackbarType.Error,
-                    timeout: 2, closeButton: true);
-
-                return;
-            }
-
             var currentVersion = Assembly.GetExecutingAssembly().GetName().Version?.ToString();
+            var check = await UpdateUtil.CheckLatestAsync();
+
+            // 更新检查要「说人话」：成功就说是不是最新版，失败就说清是哪一类失败，
+            // 让用户知道自己该做什么（开代理 / 等一小时 / 去发行页手动看）。
+            switch (check.Status)
+            {
+                case UpdateUtil.CheckStatus.Success:
+                    if (UpdateUtil.IsNewerVersion(check.LatestVersion, currentVersion))
+                    {
+                        await ShowUpdateDialog(check.LatestVersion, currentVersion);
+                    }
+                    else
+                    {
+                        SnackbarHost.Show(
+                            "已是最新版本",
+                            $"当前版本 {currentVersion}，未发现更新的版本。",
+                            SnackbarType.Success, timeout: 3);
+                    }
+                    return;
+
+                case UpdateUtil.CheckStatus.RateLimited:
+                    // 最常见的一种。GitHub 对未登录请求限额每小时 60 次，
+                    // 短期内反复启动或刷新就会撞上。
+                    SnackbarHost.Show(
+                        "暂时无法检查更新",
+                        "GitHub 接口访问次数已达上限（未登录时每小时 60 次），" +
+                        "不影响翻译功能。请稍后再试，或直接到发行页手动查看最新版本。",
+                        SnackbarType.Warning, width: 720, timeout: 6, closeButton: true);
+                    return;
+
+                case UpdateUtil.CheckStatus.NetworkError:
+                    SnackbarHost.Show(
+                        "暂时无法检查更新",
+                        "连不上 GitHub，通常是代理未开启或网络不通。" +
+                        "不影响翻译功能。可开启代理后重启，或直接到发行页手动查看最新版本。" +
+                        $"\n（{check.Detail}）",
+                        SnackbarType.Warning, width: 720, timeout: 6, closeButton: true);
+                    return;
+
+                case UpdateUtil.CheckStatus.NoRelease:
+                    SnackbarHost.Show(
+                        "暂时无法检查更新",
+                        "远端仓库还没有可用的发行版本，或版本信息读取失败。" +
+                        "不影响翻译功能，可到发行页确认。",
+                        SnackbarType.Warning, width: 720, timeout: 6, closeButton: true);
+                    return;
+
+                default:
+                    SnackbarHost.Show(
+                        "暂时无法检查更新",
+                        "更新检查遇到未预期的问题，不影响翻译功能。" +
+                        $"可到发行页手动查看最新版本。\n（{check.Detail}）",
+                        SnackbarType.Warning, width: 720, timeout: 6, closeButton: true);
+                    return;
+            }
+        }
+
+        private async Task ShowUpdateDialog(string latestVersion, string? currentVersion)
+        {
             var ignoredVersion = Translator.Setting.IgnoredUpdateVersion;
             if (!string.IsNullOrEmpty(ignoredVersion) && ignoredVersion == latestVersion)
                 return;
-            // 只有「确实比当前版本新」才提示：改了版本号算法之后，
-            // 单纯「字符串不等」会把己方更新的版本也当成新版本反复弹窗。
-            if (UpdateUtil.IsNewerVersion(latestVersion, currentVersion))
-            {
-                var dialog = new Wpf.Ui.Controls.MessageBox
-                {
-                    Title = "New Version Available",
-                    Content = $"A new version has been detected: {latestVersion}\n" +
-                              $"Current version: {currentVersion}\n" +
-                              $"Please visit GitHub to download the latest release.",
-                    PrimaryButtonText = "Update",
-                    CloseButtonText = "Ignore this version"
-                };
-                var result = await dialog.ShowDialogAsync();
 
-                if (result == Wpf.Ui.Controls.MessageBoxResult.Primary)
+            var dialog = new Wpf.Ui.Controls.MessageBox
+            {
+                Title = "发现新版本",
+                Content = $"检测到新版本：{latestVersion}\n" +
+                          $"当前版本：{currentVersion}\n" +
+                          $"请访问 GitHub 下载最新版本。",
+                PrimaryButtonText = "去更新",
+                CloseButtonText = "忽略此版本"
+            };
+            var result = await dialog.ShowDialogAsync();
+
+            if (result == Wpf.Ui.Controls.MessageBoxResult.Primary)
+            {
+                var url = UpdateUtil.GitHubReleasesUrl;
+                try
                 {
-                    var url = UpdateUtil.GitHubReleasesUrl;
-                    try
+                    Process.Start(new ProcessStartInfo
                     {
-                        Process.Start(new ProcessStartInfo
-                        {
-                            FileName = url,
-                            UseShellExecute = true
-                        });
-                    }
-                    catch (Exception ex)
-                    {
-                        SnackbarHost.Show("[ERROR] Open Browser Failed.", ex.Message, SnackbarType.Error,
-                            timeout: 2, closeButton: true);
-                    }
+                        FileName = url,
+                        UseShellExecute = true
+                    });
                 }
-                else
-                    Translator.Setting.IgnoredUpdateVersion = latestVersion;
+                catch (Exception ex)
+                {
+                    SnackbarHost.Show("打开浏览器失败。", ex.Message, SnackbarType.Error,
+                        timeout: 2, closeButton: true);
+                }
             }
+            else
+                Translator.Setting.IgnoredUpdateVersion = latestVersion;
         }
 
         public void ShowLogCard(bool enabled)

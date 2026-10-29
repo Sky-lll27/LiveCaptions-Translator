@@ -54,6 +54,14 @@ namespace LiveCaptionsTranslator.apis
             Timeout = TimeSpan.FromSeconds(8)
         };
 
+        // 字幕链路的「首句」专用：冷启动要把模型读进显存，实测约 7.6~8.7 秒，
+        // 正好压在 8 秒线上。首句用 30 秒，避免第一句必然超时；
+        // 同时这也是「未翻译重试」能成立的前提（否则重试会再次撞超时）。
+        private static readonly HttpClient coldStartClient = new HttpClient()
+        {
+            Timeout = TimeSpan.FromSeconds(30)
+        };
+
         // 「文本」页链路：长文、模型冷启动、云端大模型都需要耐心等，单独一台"总机"。
         private static readonly HttpClient patientClient = new HttpClient()
         {
@@ -64,7 +72,15 @@ namespace LiveCaptionsTranslator.apis
         // 字幕链路不贴便签 → 走 defaultClient（8 秒）。下面 11 个引擎函数因此一行都不用改。
         private static readonly AsyncLocal<HttpClient?> pipelineClient = new();
 
+        // 同一套"便签"机制：标记「这条调用链来自文本页」。
+        // 文本页必须和字幕的上下文隔离 —— 否则模型会读到「字幕原文→字幕译文」的历史对，
+        // 容易把其中一句抄进输出（用户已复现：打开上下文感知后文本页中间多出一段英文）。
+        private static readonly AsyncLocal<bool> fromTextPage = new();
+
         private static HttpClient client => pipelineClient.Value ?? defaultClient;
+
+        /// <summary>是否启用上下文感知。文本页链路一律不启用，实现两者隔离。</summary>
+        private static bool UseContext => Translator.Setting.ContextAware && !fromTextPage.Value;
 
         /// <summary>
         /// 超时错误的统一文案。超时时长取自实际使用的那台 HttpClient，
@@ -84,7 +100,28 @@ namespace LiveCaptionsTranslator.apis
         public static async Task<string> TranslatePatiently(string text, CancellationToken token = default)
         {
             var previous = pipelineClient.Value;
+            var previousFromTextPage = fromTextPage.Value;
             pipelineClient.Value = patientClient;
+            fromTextPage.Value = true;
+            try
+            {
+                return await TranslateFunction(text, token);
+            }
+            finally
+            {
+                pipelineClient.Value = previous;
+                fromTextPage.Value = previousFromTextPage;
+            }
+        }
+
+        /// <summary>
+        /// 供字幕链路的「首句」使用：用 30 秒超时的管道，专治冷启动。
+        /// 只影响当前这条调用链，后续句子仍然走 8 秒。
+        /// </summary>
+        public static async Task<string> TranslateWithColdStartRoom(string text, CancellationToken token = default)
+        {
+            var previous = pipelineClient.Value;
+            pipelineClient.Value = coldStartClient;
             try
             {
                 return await TranslateFunction(text, token);
@@ -109,7 +146,7 @@ namespace LiveCaptionsTranslator.apis
                 new BaseLLMConfig.Message { role = "user", content = $"🔤 {text} 🔤" }
             };
 
-            if (Translator.Setting.ContextAware)
+            if (UseContext)
             {
                 foreach (var entry in Translator.Caption.AwareContexts)
                 {
@@ -187,7 +224,7 @@ namespace LiveCaptionsTranslator.apis
                 new BaseLLMConfig.Message { role = "user", content = $"🔤 {text} 🔤" }
             };
 
-            if (Translator.Setting.ContextAware)
+            if (UseContext)
             {
                 foreach (var entry in Translator.Caption.AwareContexts)
                 {
@@ -247,7 +284,7 @@ namespace LiveCaptionsTranslator.apis
 
             // Build input with optional context
             string input = $"🔤 {text} 🔤";
-            if (Translator.Setting.ContextAware)
+            if (UseContext)
             {
                 var contextLines = new List<string>();
                 foreach (var entry in Translator.Caption.AwareContexts)
@@ -334,7 +371,7 @@ namespace LiveCaptionsTranslator.apis
                 new BaseLLMConfig.Message { role = "user", content = $"🔤 {text} 🔤" }
             };
 
-            if (Translator.Setting.ContextAware)
+            if (UseContext)
             {
                 foreach (var entry in Translator.Caption.AwareContexts)
                 {

@@ -18,19 +18,25 @@ namespace LiveCaptionsTranslator.models
         [JsonIgnore]
         public static Dictionary<string, string> SupportedLanguages => new()
         {
-            { "zh-CN", "zh-CN" },
-            { "zh-TW", "zh-TW" },
-            { "en-US", "en-US" },
-            { "en-GB", "en-GB" },
-            { "ja-JP", "ja-JP" },
-            { "ko-KR", "ko-KR" },
-            { "fr-FR", "fr-FR" },
-            { "th-TH", "th-TH" },
-            { "ru-RU", "ru-RU" },
-            { "es-ES", "es-ES" },
-            { "pt-BR", "pt-BR" },
-            { "tr-TR", "tr-TR" },
-            { "ar-SA", "ar-SA" },
+            // 注意：value 会被填进提示词模板的 {0} 位置，必须是语言「名称」而不是语言代码。
+            // 上游原本把 value 写成与 key 相同的语言代码（如 "zh-CN"），小模型不认识代码，
+            // 尤其源语言是日文（同样使用汉字）时会把它理解成「润色日文」，直接原样返回。
+            // 实测（21 段日文逐段翻译，统计失败段）：1.8B 模型传 zh-CN 失败 7/21，
+            // 传 Chinese 失败 2/21。
+            // key 仍为语言代码：下拉框显示的是 key，界面文字不受影响。
+            { "zh-CN", "Chinese" },
+            { "zh-TW", "Traditional Chinese" },
+            { "en-US", "English" },
+            { "en-GB", "English" },
+            { "ja-JP", "Japanese" },
+            { "ko-KR", "Korean" },
+            { "fr-FR", "French" },
+            { "th-TH", "Thai" },
+            { "ru-RU", "Russian" },
+            { "es-ES", "Spanish" },
+            { "pt-BR", "Portuguese" },
+            { "tr-TR", "Turkish" },
+            { "ar-SA", "Arabic" },
         };
 
         public event PropertyChangedEventHandler? PropertyChanged;

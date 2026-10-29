@@ -16,7 +16,7 @@ using System.Reflection;
     // 发版前改下面两个数字，并让 tag 与之一致（例如 tag: v1.7.0）。
     int major = 1;
     int minor = 7;
-    int build = 1;
+    int build = 2;
     int revision = 0;
 #>
 

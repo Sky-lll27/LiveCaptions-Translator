@@ -221,29 +221,74 @@ namespace LiveCaptionsTranslator.models
         }
 
         /// <summary>
-        /// 配置文件所在目录。优先用 exe 所在目录，避免用快捷方式 / 开机自启 /
-        /// 改了「起始位置」的方式启动时找不到原有设置、当成首次使用并新建空配置。
-        /// 若 exe 目录不可写（例如装在 Program Files），回退到当前目录，保持旧行为。
+        /// 配置文件所在目录：**exe 所在的真实目录**。
+        ///
+        /// 为什么不能直接用 AppContext.BaseDirectory：
+        /// 本项目以 PublishSingleFile=true + IncludeAllContentForSelfExtract=true 发布，
+        /// 这种单文件 exe 运行时会把自己解压到 %TEMP%\.net\&lt;名字&gt;\&lt;随机&gt;\ 下，
+        /// 而 AppContext.BaseDirectory 指向的是那个**临时解压目录**，不是 exe 所在目录。
+        /// 后果：配置和历史库被写进临时目录，每次运行随机目录还都不一样，
+        /// 用户覆盖 exe 升级后就像「设置全丢了」。
+        /// （调试版不是单文件，BaseDirectory 恰好就是真实目录，所以本地测不出来。）
+        ///
+        /// 用 Environment.ProcessPath 拿 exe 的真实路径，单文件和普通发布都正确。
+        /// 若该目录不可写（例如装在 Program Files），回退到当前目录。
         /// </summary>
         public static string DataDirectory
         {
             get
             {
-                string baseDir = AppContext.BaseDirectory;
-                if (!string.IsNullOrEmpty(baseDir))
-                {
-                    try
-                    {
-                        string probe = Path.Combine(baseDir, ".write_probe");
-                        using (File.Create(probe, 1, FileOptions.DeleteOnClose)) { }
-                        return baseDir;
-                    }
-                    catch
-                    {
-                        // exe 目录不可写，退回当前目录
-                    }
-                }
+                string? exeDir = GetExecutableDirectory();
+                if (!string.IsNullOrEmpty(exeDir) && IsWritable(exeDir))
+                    return exeDir;
+
+                // exe 目录不可写时，退回当前目录（保持可用，但不推荐）。
                 return Directory.GetCurrentDirectory();
+            }
+        }
+
+        /// <summary>取 exe 所在目录。单文件发布时也能拿到真实位置，而不是自解压临时目录。</summary>
+        private static string? GetExecutableDirectory()
+        {
+            // Environment.ProcessPath 在 .NET 6+ 可用，指向真正被启动的 exe。
+            string? processPath = Environment.ProcessPath;
+            if (!string.IsNullOrEmpty(processPath))
+            {
+                string? dir = Path.GetDirectoryName(processPath);
+                // 单文件发布时 AppContext.BaseDirectory 会指向 %TEMP%\.net\...，
+                // 若 ProcessPath 也落在临时解压目录里（极少数情况），不要用它。
+                if (!string.IsNullOrEmpty(dir) && !IsSelfExtractTempDir(dir))
+                    return dir;
+            }
+
+            // 兜底：BaseDirectory（普通发布下即 exe 目录）。
+            string baseDir = AppContext.BaseDirectory;
+            if (!string.IsNullOrEmpty(baseDir) && !IsSelfExtractTempDir(baseDir))
+                return baseDir;
+
+            return null;
+        }
+
+        /// <summary>判断某个目录是不是单文件 exe 的自解压临时目录（%TEMP%\.net\…）。</summary>
+        private static bool IsSelfExtractTempDir(string dir)
+        {
+            string temp = Path.GetTempPath();
+            return dir.StartsWith(temp, StringComparison.OrdinalIgnoreCase) &&
+                   dir.IndexOf(".net", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        /// <summary>目录是否可写（用一个随即删除的探针文件判断）。</summary>
+        private static bool IsWritable(string dir)
+        {
+            try
+            {
+                string probe = Path.Combine(dir, ".write_probe");
+                using (File.Create(probe, 1, FileOptions.DeleteOnClose)) { }
+                return true;
+            }
+            catch
+            {
+                return false;
             }
         }
 

@@ -1,4 +1,6 @@
-﻿namespace LiveCaptionsTranslator.models
+using LiveCaptionsTranslator.utils;
+
+namespace LiveCaptionsTranslator.models
 {
     public class TranslationTaskQueue
     {
@@ -43,10 +45,15 @@
             var translatedText = output.Item1;
 
             // Log after translation.
+            // 写历史前去掉界面上的延迟前缀（形如 "[  98 ms] "），
+            // 否则历史记录和导出的 CSV 里会混进延迟数字；显示仍然保留前缀。
+            // 用 LatencyPrefix() 而不是 NoticePrefix()：后者是贪婪匹配，
+            // 译文正文里若带方括号会被一起吃掉。
+            string loggedText = RegexPatterns.LatencyPrefix().Replace(translatedText, string.Empty);
             bool isOverwrite = await Translator.IsOverwrite(translationTask.OriginalText);
             if (!isOverwrite)
                 await Translator.AddContexts();
-            await Translator.Log(translationTask.OriginalText, translatedText, isOverwrite);
+            await Translator.Log(translationTask.OriginalText, loggedText, isOverwrite);
         }
     }
 

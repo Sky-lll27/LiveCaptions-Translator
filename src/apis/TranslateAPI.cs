@@ -67,6 +67,17 @@ namespace LiveCaptionsTranslator.apis
         private static HttpClient client => pipelineClient.Value ?? defaultClient;
 
         /// <summary>
+        /// 超时错误的统一文案。超时时长取自实际使用的那台 HttpClient，
+        /// 不再写死「8 秒」——文本页走的是 120 秒管道，写死会误导排查方向。
+        /// </summary>
+        private static string TimeoutError()
+        {
+            int seconds = (int)client.Timeout.TotalSeconds;
+            return $"[ERROR] Translation Failed: The request was canceled due to timeout (> {seconds} seconds), " +
+                   $"please use a faster API or check network connection.";
+        }
+
+        /// <summary>
         /// 供「文本」页使用：用 120 秒超时的管道翻译一段文本。
         /// 只影响当前这条调用链，并发进行中的字幕翻译仍然走原来的 8 秒。
         /// </summary>
@@ -144,8 +155,7 @@ namespace LiveCaptionsTranslator.apis
             catch (OperationCanceledException ex)
             {
                 if (ex.Message.StartsWith("The request"))
-                    return $"[ERROR] Translation Failed: The request was canceled due to timeout (> 8 seconds), " +
-                           $"please use a faster API or check network connection.";
+                    return TimeoutError();
                 throw;
             }
             catch (Exception ex)
@@ -207,8 +217,7 @@ namespace LiveCaptionsTranslator.apis
             catch (OperationCanceledException ex)
             {
                 if (ex.Message.StartsWith("The request"))
-                    return $"[ERROR] Translation Failed: The request was canceled due to timeout (> 8 seconds), " +
-                           $"please use a faster API or check network connection.";
+                    return TimeoutError();
                 throw;
             }
             catch (Exception ex)
@@ -273,8 +282,7 @@ namespace LiveCaptionsTranslator.apis
             catch (OperationCanceledException ex)
             {
                 if (ex.Message.StartsWith("The request"))
-                    return $"[ERROR] Translation Failed: The request was canceled due to timeout (> 8 seconds), " +
-                           $"please use a faster API or check network connection.";
+                    return TimeoutError();
                 throw;
             }
             catch (Exception ex)
@@ -357,8 +365,7 @@ namespace LiveCaptionsTranslator.apis
             catch (OperationCanceledException ex)
             {
                 if (ex.Message.StartsWith("The request"))
-                    return $"[ERROR] Translation Failed: The request was canceled due to timeout (> 8 seconds), " +
-                           $"please use a faster API or check network connection.";
+                    return TimeoutError();
                 throw;
             }
             catch (Exception ex)
@@ -398,8 +405,7 @@ namespace LiveCaptionsTranslator.apis
             catch (OperationCanceledException ex)
             {
                 if (ex.Message.StartsWith("The request"))
-                    return $"[ERROR] Translation Failed: The request was canceled due to timeout (> 8 seconds), " +
-                           $"please use a faster API or check network connection.";
+                    return TimeoutError();
                 throw;
             }
             catch (Exception ex)
@@ -444,8 +450,7 @@ namespace LiveCaptionsTranslator.apis
             catch (OperationCanceledException ex)
             {
                 if (ex.Message.StartsWith("The request"))
-                    return $"[ERROR] Translation Failed: The request was canceled due to timeout (> 8 seconds), " +
-                           $"please use a faster API or check network connection.";
+                    return TimeoutError();
                 throw;
             }
             catch (Exception ex)
@@ -499,8 +504,7 @@ namespace LiveCaptionsTranslator.apis
             catch (OperationCanceledException ex)
             {
                 if (ex.Message.StartsWith("The request"))
-                    return $"[ERROR] Translation Failed: The request was canceled due to timeout (> 8 seconds), " +
-                           $"please use a faster API or check network connection.";
+                    return TimeoutError();
                 throw;
             }
             catch (Exception ex)
@@ -557,8 +561,7 @@ namespace LiveCaptionsTranslator.apis
             catch (OperationCanceledException ex)
             {
                 if (ex.Message.StartsWith("The request"))
-                    return $"[ERROR] Translation Failed: The request was canceled due to timeout (> 8 seconds), " +
-                           $"please use a faster API or check network connection.";
+                    return TimeoutError();
                 throw;
             }
             catch (Exception ex)
@@ -611,8 +614,7 @@ namespace LiveCaptionsTranslator.apis
             catch (OperationCanceledException ex)
             {
                 if (ex.Message.StartsWith("The request"))
-                    return $"[ERROR] Translation Failed: The request was canceled due to timeout (> 8 seconds), " +
-                           $"please use a faster API or check network connection.";
+                    return TimeoutError();
                 throw;
             }
             catch (Exception ex)
@@ -662,8 +664,7 @@ namespace LiveCaptionsTranslator.apis
             catch (OperationCanceledException ex)
             {
                 if (ex.Message.StartsWith("The request"))
-                    return $"[ERROR] Translation Failed: The request was canceled due to timeout (> 8 seconds), " +
-                           $"please use a faster API or check network connection.";
+                    return TimeoutError();
                 throw;
             }
             catch (Exception ex)
@@ -716,8 +717,7 @@ namespace LiveCaptionsTranslator.apis
             catch (OperationCanceledException ex)
             {
                 if (ex.Message.StartsWith("The request"))
-                    return $"[ERROR] Translation Failed: The request was canceled due to timeout (> 8 seconds), " +
-                           $"please use a faster API or check network connection.";
+                    return TimeoutError();
                 throw;
             }
             catch (Exception ex)

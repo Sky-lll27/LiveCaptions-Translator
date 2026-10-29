@@ -220,17 +220,48 @@ namespace LiveCaptionsTranslator.models
             };
         }
 
+        /// <summary>
+        /// 配置文件所在目录。优先用 exe 所在目录，避免用快捷方式 / 开机自启 /
+        /// 改了「起始位置」的方式启动时找不到原有设置、当成首次使用并新建空配置。
+        /// 若 exe 目录不可写（例如装在 Program Files），回退到当前目录，保持旧行为。
+        /// </summary>
+        public static string DataDirectory
+        {
+            get
+            {
+                string baseDir = AppContext.BaseDirectory;
+                if (!string.IsNullOrEmpty(baseDir))
+                {
+                    try
+                    {
+                        string probe = Path.Combine(baseDir, ".write_probe");
+                        using (File.Create(probe, 1, FileOptions.DeleteOnClose)) { }
+                        return baseDir;
+                    }
+                    catch
+                    {
+                        // exe 目录不可写，退回当前目录
+                    }
+                }
+                return Directory.GetCurrentDirectory();
+            }
+        }
+
+        public static string DataPath(string fileName) => Path.Combine(DataDirectory, fileName);
+
         public static Setting Load()
         {
-            string jsonPath = Path.Combine(Directory.GetCurrentDirectory(), FILENAME);
+            string jsonPath = DataPath(FILENAME);
             try
             {
                 return Load(jsonPath);
             }
             catch (JsonException)
             {
+                // 备份文件已存在时 File.Move 会抛异常，导致「自动修复」变成启动失败。
+                // 改为覆盖备份，保证坏掉的配置总能被移走。
                 string backupPath = jsonPath + ".bak";
-                File.Move(jsonPath, backupPath);
+                File.Move(jsonPath, backupPath, overwrite: true);
                 return Load(jsonPath);
             }
         }
@@ -279,7 +310,7 @@ namespace LiveCaptionsTranslator.models
 
         public void Save()
         {
-            Save(FILENAME);
+            Save(DataPath(FILENAME));
         }
 
         public void Save(string jsonPath)
@@ -303,7 +334,7 @@ namespace LiveCaptionsTranslator.models
 
         public static bool IsConfigExist()
         {
-            string jsonPath = Path.Combine(Directory.GetCurrentDirectory(), FILENAME);
+            string jsonPath = DataPath(FILENAME);
             return File.Exists(jsonPath);
         }
     }

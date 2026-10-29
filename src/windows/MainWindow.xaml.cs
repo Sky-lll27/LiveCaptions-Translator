@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.Reflection;
 using System.Windows;
 using Wpf.Ui.Appearance;
@@ -190,7 +190,9 @@ namespace LiveCaptionsTranslator
             var ignoredVersion = Translator.Setting.IgnoredUpdateVersion;
             if (!string.IsNullOrEmpty(ignoredVersion) && ignoredVersion == latestVersion)
                 return;
-            if (!string.IsNullOrEmpty(latestVersion) && latestVersion != currentVersion)
+            // 只有「确实比当前版本新」才提示：改了版本号算法之后，
+            // 单纯「字符串不等」会把己方更新的版本也当成新版本反复弹窗。
+            if (UpdateUtil.IsNewerVersion(latestVersion, currentVersion))
             {
                 var dialog = new Wpf.Ui.Controls.MessageBox
                 {

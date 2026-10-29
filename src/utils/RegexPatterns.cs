@@ -26,6 +26,12 @@ namespace LiveCaptionsTranslator.utils
         [GeneratedRegex(@"^\[.+\] ")]
         public static partial Regex NoticePrefix();
 
+        // 只匹配界面上的延迟前缀（形如 "[  98 ms] "）。
+        // 写历史时用它剥离，不能复用 NoticePrefix()：后者是贪婪的 `^\[.+\] `，
+        // 若译文正文里带方括号会被一并吃掉。
+        [GeneratedRegex(@"^\[\s*\d+\s*ms\]\s")]
+        public static partial Regex LatencyPrefix();
+
         [GeneratedRegex(@"^(https?:\/\/)")]
         public static partial Regex HttpPrefix();
 

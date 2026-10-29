@@ -1,4 +1,4 @@
-﻿using System.IO;
+using System.IO;
 using System.Text;
 using System.Globalization;
 using Microsoft.Data.Sqlite;
@@ -10,7 +10,10 @@ namespace LiveCaptionsTranslator.utils
 {
     public static class SQLiteHistoryLogger
     {
-        public static readonly string CONNECTION_STRING = "Data Source=translation_history.db;";
+        // 历史库和 setting.json 放在同一个目录（优先 exe 所在目录），
+        // 避免换了「起始位置」启动就变成空历史。
+        public static readonly string CONNECTION_STRING =
+            "Data Source=" + Setting.DataPath("translation_history.db") + ";";
 
         private static SqliteConnection _sharedConnection;
         private static readonly object _connectionLock = new object();

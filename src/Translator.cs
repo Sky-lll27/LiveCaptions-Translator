@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.IO;
 using System.Text;
 using System.Windows.Automation;
@@ -37,7 +37,7 @@ namespace LiveCaptionsTranslator
             LiveCaptionsHandler.FixLiveCaptions(Window);
             LiveCaptionsHandler.HideLiveCaptions(Window);
 
-            if (!File.Exists(Path.Combine(Directory.GetCurrentDirectory(), models.Setting.FILENAME)))
+            if (!File.Exists(models.Setting.DataPath(models.Setting.FILENAME)))
                 FirstUseFlag = true;
 
             caption = Caption.GetInstance();
